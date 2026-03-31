@@ -301,9 +301,25 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		)
 	}
 
-	// РИСУЕМ ИГРОКА
+	offX := math.Floor(g.cameraX)
+
+	// 3. РИСУЕМ ИГРОКА
 	op := &ebiten.DrawImageOptions{}
-	// Здесь тоже используем округленную камеру
-	op.GeoM.Translate(g.playerX-g.cameraX, g.playerY-g.cameraY)
+
+	// ПОВОРОТ (ОТЗЕРКАЛИВАНИЕ)
+	if g.playerVX < 0 {
+		// 1. Отзеркаливаем по горизонтали
+		op.GeoM.Scale(-1, 1)
+		// 2. Сдвигаем обратно на ширину игрока,
+		// так как Scale(-1, 1) разворачивает относительно левого края
+		op.GeoM.Translate(float64(PlayerW), 0)
+	}
+
+	// ФИНАЛЬНОЕ ПОЗИЦИОНИРОВАНИЕ
+	// Важно: Поворот должен идти ДО трансляции в координаты мира
+	drawX := math.Floor(g.playerX - offX)
+	drawY := math.Floor(g.playerY - g.cameraY)
+
+	op.GeoM.Translate(drawX, drawY)
 	screen.DrawImage(g.playerImg, op)
 }
