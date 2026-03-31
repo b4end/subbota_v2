@@ -295,10 +295,16 @@ func (g *Game) Update() error {
 	// 1. ОПРЕДЕЛЯЕМ ЦЕЛЕВОЙ УГОЛ (где меч хочет быть)
 	// По умолчанию меч "хочет" быть за спиной
 	destAngle := 0.0
-	if g.playerVX >= 0 {
-		destAngle = math.Pi * 0.85 // 180 градусов (слева от игрока, если идем вправо)
+	if g.playerVX > 0 {
+		destAngle = math.Pi * 0.85 // слева от игрока, если идем вправо
+	} else if g.playerVX < 0 {
+		destAngle = math.Pi*1.15 + math.Pi // справа от игрока, если идем влево
 	} else {
-		destAngle = math.Pi*1.15 + math.Pi // 0 градусов (справа от игрока, если идем влево)
+		if g.lastDir == 1 {
+			destAngle = math.Pi * 0.85
+		} else {
+			destAngle = math.Pi*1.15 + math.Pi
+		}
 	}
 
 	// Небольшой наклон при прыжках/падении для динамики
@@ -381,6 +387,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.playerVX < 0 {
 		op.GeoM.Scale(-1, 1)
 		op.GeoM.Translate(float64(PlayerW), 0)
+	} else if g.playerVX == 0 {
+		if g.lastDir == -1 {
+			op.GeoM.Scale(-1, 1)
+			op.GeoM.Translate(float64(PlayerW), 0)
+		}
 	}
 
 	drawX := math.Floor(g.playerX - offX)
