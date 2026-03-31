@@ -20,17 +20,17 @@ import (
 var assetFS embed.FS
 
 const (
-	DeadZoneW = 150  // Ширина "свободной зоны" в пикселях
-	WorldW    = 1000 // Общая длина твоего уровня
+	DeadZoneW = 300  // Ширина "свободной зоны" в пикселях
+	WorldW    = 2000 // Общая длина твоего уровня
 
-	ScreenW, ScreenH = 640, 360
-	PlayerW, PlayerH = 28, 32
+	ScreenW, ScreenH = 1280, 720
+	PlayerW, PlayerH = 56, 64
 
-	gravity     = 0.25 // Сила гравитации (насколько быстро разгоняется вниз)
-	jumpSpeed   = -5.5 // Сила прыжка (отрицательная, так как Y идет вверх)
-	runSpeed    = 0.3  // Ускорение бега влево/вправо
-	maxRunSpeed = 3.0  // Максимальная скорость бега
-	friction    = 1.0  // Сила трения
+	gravity     = 0.5   // Сила гравитации (насколько быстро разгоняется вниз)
+	jumpSpeed   = -11.0 // Сила прыжка (отрицательная, так как Y идет вверх)
+	runSpeed    = 0.6   // Ускорение бега влево/вправо
+	maxRunSpeed = 6.0   // Максимальная скорость бега
+	friction    = 4.0   // Сила трения
 )
 
 // Структура нашего цветного блока (платформы)
@@ -124,10 +124,10 @@ func (g *Game) initialize() {
 	g.initialized = true
 
 	g.blocks = []Block{
-		{rect: image.Rect(0, 320, 1000, 360), color: color.RGBA{100, 100, 100, 255}}, // Пол
-		{rect: image.Rect(400, 240, 500, 260), color: color.RGBA{255, 50, 50, 255}},  // Платформа 1
-		{rect: image.Rect(300, 275, 400, 295), color: color.RGBA{50, 255, 50, 255}},  // Платформа 2
-		{rect: image.Rect(530, 200, 550, 320), color: color.RGBA{50, 50, 255, 255}},  // Стена
+		{rect: image.Rect(0, 640, 2000, 720), color: color.RGBA{100, 100, 100, 255}},  // Пол
+		{rect: image.Rect(800, 480, 1000, 520), color: color.RGBA{255, 50, 50, 255}},  // Платформа 1
+		{rect: image.Rect(600, 550, 800, 590), color: color.RGBA{50, 255, 50, 255}},   // Платформа 2
+		{rect: image.Rect(1060, 400, 1100, 640), color: color.RGBA{50, 50, 255, 255}}, // Стена
 	}
 
 	g.initialized = true
@@ -198,7 +198,6 @@ func (g *Game) Update() error {
 	if targetDir != 0 {
 		g.playerVX += targetDir * runSpeed
 	} else {
-		friction := 0.2 // Чуть увеличил для отзывчивости
 		if g.playerVX > 0 {
 			g.playerVX = math.Max(0, g.playerVX-friction)
 		} else if g.playerVX < 0 {
@@ -259,7 +258,7 @@ func (g *Game) Update() error {
 	}
 
 	// ПРОВЕРКА ВЫЛЕТА ЗА ПРЕДЕЛЫ МИРА
-	if g.playerY > ScreenH || g.playerX < -50 || g.playerX > 1000+50 {
+	if g.playerY > ScreenH || g.playerX < -100 || g.playerX > 2000+100 {
 		g.reset()
 	}
 
@@ -322,14 +321,14 @@ func (g *Game) Update() error {
 	g.sword.targetAngle += diff * angleSpeed
 
 	// 3. РАСЧЕТ ДИНАМИЧЕСКОГО РАДИУСА (Сплющивание)
-	baseRadius := 17.0
+	baseRadius := 36.0
 	// Легкое покачивание (idle)
 	//baseRadius += math.Sin(float64(g.ticks)*0.06) * 1.5
 
 	// Эффект "выталкивания" из верхней и нижней зон
 	// Когда Sin(angle) близок к 1 или -1 (верх/низ), уменьшаем радиус (вдавливаем к игроку)
 	pinch := math.Abs(math.Sin(g.sword.targetAngle))
-	currentRadius := baseRadius * (1.0 - pinch*0.35) // Вдавливание на 35%
+	currentRadius := baseRadius * (1.0 - pinch*0.5) // Вдавливание на 35%
 
 	// 4. ЦЕЛЕВЫЕ КООРДИНАТЫ (вокруг центра игрока)
 	centerX := g.playerX + PlayerW/2
