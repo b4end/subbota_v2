@@ -39,6 +39,13 @@ type Block struct {
 	color color.RGBA      // Цвет
 }
 
+type Sword struct {
+	x, y        float64 // Текущие координаты меча
+	angle       float64 // Текущий угол поворота меча
+	targetAngle float64 // Угол, куда меч стремится
+	img         *ebiten.Image
+}
+
 // структура хранящая все необходимые данные для работы игры
 type Game struct {
 	// цвет фона
@@ -46,6 +53,9 @@ type Game struct {
 
 	// картинка игрока
 	playerImg *ebiten.Image
+
+	sword Sword
+	ticks int // Счетчик времени для анимации покачивания (idle)
 
 	// координаты камеры
 	cameraX, cameraY float64
@@ -96,6 +106,8 @@ func loadImage(assetPath string) *ebiten.Image {
 func (g *Game) reset() {
 	g.playerX = ScreenW/2 - PlayerW/2
 	g.playerY = ScreenH/2 - PlayerH/2
+	g.sword.x = ScreenW/2 - PlayerW/2
+	g.sword.y = ScreenH/2 - PlayerH/2
 	g.playerVX = 0
 	g.playerVY = 0
 }
@@ -105,6 +117,7 @@ func (g *Game) reset() {
 func (g *Game) initialize() {
 	g.backgroundColor = color.RGBA{0, 181, 226, 255}
 	g.playerImg = loadImage("asset/image/knight.png")
+	g.sword.img = loadImage("asset/image/sword.png")
 	g.reset()
 
 	g.fullscreen = true
@@ -277,6 +290,64 @@ func (g *Game) Update() error {
 	//	g.cameraX = maxCamX
 	//}
 
+	// ЛОГИКА МЕЧА (Встраиваем сюда)
+	g.ticks++ // Увеличиваем счетчик для анимации idle
+
+	// 1. ОПРЕДЕЛЯЕМ ЦЕЛЕВОЙ УГОЛ (где меч хочет быть)
+	// По умолчанию меч "хочет" быть за спиной
+	destAngle := 0.0
+	if g.playerVX >= 0 {
+		destAngle = math.Pi * 0.85 // 180 градусов (слева от игрока, если идем вправо)
+	} else {
+		destAngle = math.Pi*1.15 + math.Pi // 0 градусов (справа от игрока, если идем влево)
+	}
+
+	// Небольшой наклон при прыжках/падении для динамики
+	if g.playerVY > 0 {
+		destAngle += 0.4
+	} else if g.playerVY < 0 {
+		destAngle -= 0.4
+	}
+
+	// 2. ПЛАВНЫЙ ПЕРЕЛЕТ УГЛА (Lerp Angle)
+	// Ищем кратчайший путь между углами, чтобы меч не крутил лишние круги
+	const angleSpeed = 0.1
+	diff := destAngle - g.sword.targetAngle
+	for diff < -math.Pi {
+		diff += 2 * math.Pi
+	}
+	for diff > math.Pi {
+		diff -= 2 * math.Pi
+	}
+	g.sword.targetAngle += diff * angleSpeed
+
+	// 3. РАСЧЕТ ДИНАМИЧЕСКОГО РАДИУСА (Сплющивание)
+	baseRadius := 17.0
+	// Легкое покачивание (idle)
+	//baseRadius += math.Sin(float64(g.ticks)*0.06) * 1.5
+
+	// Эффект "выталкивания" из верхней и нижней зон
+	// Когда Sin(angle) близок к 1 или -1 (верх/низ), уменьшаем радиус (вдавливаем к игроку)
+	pinch := math.Abs(math.Sin(g.sword.targetAngle))
+	currentRadius := baseRadius * (1.0 - pinch*0.35) // Вдавливание на 35%
+
+	// 4. ЦЕЛЕВЫЕ КООРДИНАТЫ (вокруг центра игрока)
+	centerX := g.playerX + PlayerW/2
+	centerY := g.playerY + PlayerH/2
+
+	targetX := centerX + math.Cos(g.sword.targetAngle)*currentRadius
+	targetY := centerY + math.Sin(g.sword.targetAngle)*currentRadius
+
+	// 5. ВЯЗКАЯ ФИЗИКА (Следование меча за целью)
+	// Чем меньше число, тем более "ленивым" и плавным будет меч (как в Soul Knight)
+	const followSpeed = 0.7
+	g.sword.x += (targetX - g.sword.x) * followSpeed
+	g.sword.y += (targetY - g.sword.y) * followSpeed / 3
+
+	// 6. ПОВОРОТ САМОГО МЕЧА
+	// Меч всегда направлен острием от центра игрока
+	g.sword.angle = math.Atan2(g.sword.y-centerY, g.sword.x-centerX)
+
 	return nil
 }
 
@@ -287,11 +358,10 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(g.backgroundColor)
 
-	// РИСУЕМ БЛОКИ
+	// 1. РИСУЕМ БЛОКИ
 	for _, b := range g.blocks {
 		vector.DrawFilledRect(
 			screen,
-			// Используем renderCamX вместо g.cameraX
 			float32(float64(b.rect.Min.X)-g.cameraX),
 			float32(float64(b.rect.Min.Y)-g.cameraY),
 			float32(b.rect.Dx()),
@@ -301,25 +371,43 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		)
 	}
 
+	// Общий офсет камеры для игрока и меча
 	offX := math.Floor(g.cameraX)
+	offY := math.Floor(g.cameraY)
 
-	// 3. РИСУЕМ ИГРОКА
+	// 2. РИСУЕМ ИГРОКА
 	op := &ebiten.DrawImageOptions{}
 
-	// ПОВОРОТ (ОТЗЕРКАЛИВАНИЕ)
+	// ПОВОРОТ ИГРОКА (ОТЗЕРКАЛИВАНИЕ)
 	if g.playerVX < 0 {
-		// 1. Отзеркаливаем по горизонтали
 		op.GeoM.Scale(-1, 1)
-		// 2. Сдвигаем обратно на ширину игрока,
-		// так как Scale(-1, 1) разворачивает относительно левого края
 		op.GeoM.Translate(float64(PlayerW), 0)
 	}
 
-	// ФИНАЛЬНОЕ ПОЗИЦИОНИРОВАНИЕ
-	// Важно: Поворот должен идти ДО трансляции в координаты мира
 	drawX := math.Floor(g.playerX - offX)
-	drawY := math.Floor(g.playerY - g.cameraY)
-
+	drawY := math.Floor(g.playerY - offY)
 	op.GeoM.Translate(drawX, drawY)
 	screen.DrawImage(g.playerImg, op)
+
+	// 3. РИСУЕМ МЕЧ (Встраиваем логику сюда)
+	if g.sword.img != nil {
+		swordOp := &ebiten.DrawImageOptions{}
+
+		// А. Центрируем спрайт меча, чтобы он вращался вокруг своего центра/рукояти
+		sw, sh := g.sword.img.Bounds().Dx(), g.sword.img.Bounds().Dy()
+		swordOp.GeoM.Translate(-float64(sw)/2, -float64(sh)/2)
+
+		// Б. Применяем угол поворота (вычисленный в Update)
+		swordOp.GeoM.Rotate(g.sword.angle)
+
+		// В. Переносим в мировые координаты с учетом камеры
+		// Используем те же offX и offY, что и для игрока
+		swordDrawX := g.sword.x - offX
+		swordDrawY := g.sword.y - offY
+
+		// Округляем позицию меча, чтобы он не дрожал относительно игрока
+		swordOp.GeoM.Translate(math.Floor(swordDrawX), math.Floor(swordDrawY))
+
+		screen.DrawImage(g.sword.img, swordOp)
+	}
 }
