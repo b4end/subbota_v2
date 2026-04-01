@@ -20,17 +20,18 @@ import (
 var assetFS embed.FS
 
 const (
-	DeadZoneW = 300  // Ширина "свободной зоны" в пикселях
-	WorldW    = 2000 // Общая длина твоего уровня
+	ScreenW, ScreenH = 2360, 1440
+	SRR              = ScreenH / 360 // Коэффициент разрешения экрана (screen resolution ratio)
+	PlayerW, PlayerH = 28 * SRR, 32 * SRR
 
-	ScreenW, ScreenH = 1280, 720
-	PlayerW, PlayerH = 56, 64
+	DeadZoneW = 150 * SRR  // Ширина "свободной зоны" в пикселях
+	WorldW    = 1000 * SRR // Общая длина твоего уровня
 
-	gravity     = 0.5   // Сила гравитации (насколько быстро разгоняется вниз)
-	jumpSpeed   = -11.0 // Сила прыжка (отрицательная, так как Y идет вверх)
-	runSpeed    = 0.6   // Ускорение бега влево/вправо
-	maxRunSpeed = 6.0   // Максимальная скорость бега
-	friction    = 4.0   // Сила трения
+	gravity     = 0.25 * SRR // Сила гравитации (насколько быстро разгоняется вниз)
+	jumpSpeed   = -5.5 * SRR // Сила прыжка (отрицательная, так как Y идет вверх)
+	runSpeed    = 0.3 * SRR  // Ускорение бега влево/вправо
+	maxRunSpeed = 3.0 * SRR  // Максимальная скорость бега
+	friction    = 2.0 * SRR  // Сила трения
 )
 
 // Структура нашего цветного блока (платформы)
@@ -116,18 +117,27 @@ func (g *Game) reset() {
 // здесь мы зададим начальное состояние игры и загрузим все ресурсы
 func (g *Game) initialize() {
 	g.backgroundColor = color.RGBA{0, 181, 226, 255}
-	g.playerImg = loadImage("asset/image/knight.png")
-	g.sword.img = loadImage("asset/image/sword.png")
+	if ScreenH == 360 {
+		g.playerImg = loadImage("asset/image/knight360.png")
+		g.sword.img = loadImage("asset/image/sword360.png")
+	} else if ScreenH == 720 {
+		g.playerImg = loadImage("asset/image/knight720.png")
+		g.sword.img = loadImage("asset/image/sword720.png")
+	} else if ScreenH == 1440 {
+		g.playerImg = loadImage("asset/image/knight1440.png")
+		g.sword.img = loadImage("asset/image/sword1440.png")
+	}
+
 	g.reset()
 
 	g.fullscreen = true
 	g.initialized = true
 
 	g.blocks = []Block{
-		{rect: image.Rect(0, 640, 2000, 720), color: color.RGBA{100, 100, 100, 255}},  // Пол
-		{rect: image.Rect(800, 480, 1000, 520), color: color.RGBA{255, 50, 50, 255}},  // Платформа 1
-		{rect: image.Rect(600, 550, 800, 590), color: color.RGBA{50, 255, 50, 255}},   // Платформа 2
-		{rect: image.Rect(1060, 400, 1100, 640), color: color.RGBA{50, 50, 255, 255}}, // Стена
+		{rect: image.Rect(0*SRR, 320*SRR, 1000*SRR, 350*SRR), color: color.RGBA{100, 100, 100, 255}}, // Пол
+		{rect: image.Rect(400*SRR, 240*SRR, 500*SRR, 260*SRR), color: color.RGBA{255, 50, 50, 255}},  // Платформа 1
+		{rect: image.Rect(300*SRR, 275*SRR, 400*SRR, 295*SRR), color: color.RGBA{50, 255, 50, 255}},  // Платформа 2
+		{rect: image.Rect(530*SRR, 200*SRR, 550*SRR, 320*SRR), color: color.RGBA{50, 50, 255, 255}},  // Стена
 	}
 
 	g.initialized = true
@@ -258,7 +268,7 @@ func (g *Game) Update() error {
 	}
 
 	// ПРОВЕРКА ВЫЛЕТА ЗА ПРЕДЕЛЫ МИРА
-	if g.playerY > ScreenH || g.playerX < -100 || g.playerX > 2000+100 {
+	if g.playerY > ScreenH || g.playerX < -50*SRR || g.playerX > (1000+50)*SRR {
 		g.reset()
 	}
 
@@ -327,7 +337,7 @@ func (g *Game) Update() error {
 	g.sword.targetAngle += diff * angleSpeed
 
 	// 3. РАСЧЕТ ДИНАМИЧЕСКОГО РАДИУСА (Сплющивание)
-	baseRadius := 36.0
+	baseRadius := 18.0 * SRR
 	// Легкое покачивание (idle)
 	//baseRadius += math.Sin(float64(g.ticks)*0.06) * 1.5
 
