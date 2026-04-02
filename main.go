@@ -15,7 +15,7 @@ func main() {
 	ebiten.SetWindowSize(cmd.ScreenW, cmd.ScreenH)
 	ebiten.SetFullscreen(true)
 	ebiten.SetVsyncEnabled(true)
-	ebiten.SetTPS(ebiten.SyncWithFPS)
+	ebiten.SetTPS(60)
 
 	err := ebiten.RunGame(&cmd.Game{})
 	if err != nil {

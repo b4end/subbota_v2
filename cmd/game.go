@@ -13,14 +13,14 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// содержать виртуальную файловую систему с вашими файлами,
+// содержать виртуальную файловую систему с файлами,
 // "вшитыми" прямо внутрь исполняемого файла
 
 //go:embed asset/image/*
 var assetFS embed.FS
 
 const (
-	ScreenW, ScreenH = 2360, 1440
+	ScreenW, ScreenH = 3360, 1440
 	SRR              = ScreenH / 360 // Коэффициент разрешения экрана (screen resolution ratio)
 	PlayerW, PlayerH = 28 * SRR, 32 * SRR
 
