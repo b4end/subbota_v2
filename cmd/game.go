@@ -20,7 +20,7 @@ import (
 var assetFS embed.FS
 
 const (
-	ScreenW, ScreenH = 3360, 1440
+	ScreenW, ScreenH = 2360, 1440
 	SRR              = ScreenH / 360 // Коэффициент разрешения экрана (screen resolution ratio)
 	PlayerW, PlayerH = 28 * SRR, 32 * SRR
 
@@ -302,7 +302,7 @@ func (g *Game) Update() error {
 	// ЛОГИКА МЕЧА (Встраиваем сюда)
 	g.ticks++ // Увеличиваем счетчик для анимации idle
 
-	// 1. ОПРЕДЕЛЯЕМ ЦЕЛЕВОЙ УГОЛ (где меч хочет быть)
+	// 1. ОПРЕДЕЛЯЕМ ЦЕЛЕВОЙ УГОЛ
 	// По умолчанию меч "хочет" быть за спиной
 	destAngle := 0.0
 	if g.playerVX > 0 {
@@ -313,7 +313,7 @@ func (g *Game) Update() error {
 		if g.lastDir == 1 {
 			destAngle = math.Pi * 0.85
 		} else {
-			destAngle = math.Pi*1.15 + math.Pi
+			destAngle = math.Pi * 0.15
 		}
 	}
 
@@ -336,28 +336,31 @@ func (g *Game) Update() error {
 	}
 	g.sword.targetAngle += diff * angleSpeed
 
-	// 3. РАСЧЕТ ДИНАМИЧЕСКОГО РАДИУСА (Сплющивание)
+	// 3. ВЫЧИСЛЯЕМ "ИДЕАЛЬНУЮ" ЦЕЛЬ (чистая окружность)
 	baseRadius := 18.0 * SRR
-	// Легкое покачивание (idle)
-	//baseRadius += math.Sin(float64(g.ticks)*0.06) * 1.5
-
-	// Эффект "выталкивания" из верхней и нижней зон
-	// Когда Sin(angle) близок к 1 или -1 (верх/низ), уменьшаем радиус (вдавливаем к игроку)
-	pinch := math.Abs(math.Sin(g.sword.targetAngle))
-	currentRadius := baseRadius * (1.0 - pinch*0.5) // Вдавливание на 35%
-
-	// 4. ЦЕЛЕВЫЕ КООРДИНАТЫ (вокруг центра игрока)
 	centerX := g.playerX + PlayerW/2
 	centerY := g.playerY + PlayerH/2
 
-	targetX := centerX + math.Cos(g.sword.targetAngle)*currentRadius
-	targetY := centerY + math.Sin(g.sword.targetAngle)*currentRadius
+	targetX := centerX + math.Cos(g.sword.targetAngle)*baseRadius
+	targetY := centerY + math.Sin(g.sword.targetAngle)*baseRadius
 
 	// 5. ВЯЗКАЯ ФИЗИКА (Следование меча за целью)
 	// Чем меньше число, тем более "ленивым" и плавным будет меч (как в Soul Knight)
 	const followSpeed = 0.7
 	g.sword.x += (targetX - g.sword.x) * followSpeed
 	g.sword.y += (targetY - g.sword.y) * followSpeed / 3
+
+	// 5. ВОЗВРАТ НА ЧЕТНОЕ РАССТОЯНИЕ И ВЫТАЛКИВАНИЕ (Новая магия!)
+	// Узнаем, под каким углом меч оказался СЕЙЧАС, после применения вязкости
+	currentAngle := math.Atan2(g.sword.y-centerY, g.sword.x-centerX)
+
+	// Считаем выталкивание (сплющивание) именно для ТЕКУЩЕГО угла
+	pinch := math.Abs(math.Sin(currentAngle))
+	currentRadius := baseRadius * (1.0 - pinch*0.5)
+
+	// Принудительно "выталкиваем" меч на правильную орбиту
+	g.sword.x = centerX + math.Cos(currentAngle)*currentRadius
+	g.sword.y = centerY + math.Sin(currentAngle)*currentRadius
 
 	// 6. ПОВОРОТ САМОГО МЕЧА
 	// Меч всегда направлен острием от центра игрока
