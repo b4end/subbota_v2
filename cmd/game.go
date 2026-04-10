@@ -67,6 +67,7 @@ type Game struct {
 	jumpBufferTimer int // Сколько кадров еще действует нажатие прыжка
 
 	lastDir float64 // Какое направление было нажато последним (-1 или 1)
+	lastVX  float64 // Последняя скорость
 
 	// скорость игрока
 	playerVX float64 // Скорость по оси X (для бега)
@@ -111,6 +112,7 @@ func (g *Game) reset() {
 	g.sword.y = ScreenH/2 - PlayerH/2
 	g.playerVX = 0
 	g.playerVY = 0
+	g.lastVX = 1
 }
 
 // метод, который будет вызываться один раз при запуске игры
@@ -222,6 +224,10 @@ func (g *Game) Update() error {
 		g.playerVX = -maxRunSpeed
 	}
 
+	if g.playerVX != 0 {
+		g.lastVX = g.playerVX
+	}
+
 	// Применение X и коллизии (твой старый код)
 	g.playerX += g.playerVX
 	for _, b := range g.blocks {
@@ -323,28 +329,15 @@ func (g *Game) Update() error {
 
 	if g.playerVX < 0 {
 		destAngle = math.Pi * 0.15
-	} else if g.playerVX == 0 {
-		if g.lastDir == -1 {
+	} else if g.playerVX > 0 {
+		destAngle = math.Pi * 0.85
+	} else {
+		if g.lastVX < 0 {
 			destAngle = math.Pi * 0.15
 		} else {
 			destAngle = math.Pi * 0.85
 		}
-	} else {
-		destAngle = math.Pi * 0.85
 	}
-
-	// Проверяем, куда в последний раз двигался игрок по оси X.
-	//if g.lastDir == 1 {
-	// Если игрок смотрел вправо (1), меч должен висеть у него ЗА спиной, то есть слева.
-	// В тригонометрии 0 - это право, Пи (3.14) - это лево.
-	// Мы используем math.Pi * 0.85 (чуть меньше 180 градусов), чтобы меч висел
-	// не строго горизонтально сзади, а чуть-чуть повыше плеча.
-	//	destAngle = math.Pi * 0.85
-	//} else {
-	// Если игрок смотрел влево (-1), меч должен висеть справа от него.
-	// math.Pi * 0.15 - это симметричный угол справа (чуть выше горизонтали).
-	//	destAngle = math.Pi * 0.15
-	//}
 
 	// Добавляем реакцию на вертикальное движение (прыжок и падение).
 	// Напомним: в 2D графике координата Y растет ВНИЗ.
@@ -507,7 +500,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		op.GeoM.Scale(-1, 1)
 		op.GeoM.Translate(float64(PlayerW), 0)
 	} else if g.playerVX == 0 {
-		if g.lastDir == -1 {
+		if g.lastVX < 0 {
 			op.GeoM.Scale(-1, 1)
 			op.GeoM.Translate(float64(PlayerW), 0)
 		}
