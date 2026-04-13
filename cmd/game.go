@@ -27,11 +27,12 @@ const (
 	DeadZoneW = 150 * SRR  // Ширина "мертвой зоны" в пикселях
 	WorldW    = 1000 * SRR // Общая длина уровня
 
-	gravity     = 0.25 * SRR // Сила гравитации (насколько быстро разгоняется вниз)
-	jumpSpeed   = -5.5 * SRR // Сила прыжка (отрицательная, так как Y идет вверх)
-	runSpeed    = 0.3 * SRR  // Ускорение бега влево/вправо
-	maxRunSpeed = 3.0 * SRR  // Максимальная скорость бега
-	friction    = 2.0 * SRR  // Сила трения (уменьшение скорости)
+	gravity        = 0.22 * SRR // Сила гравитации (насколько быстро разгоняется вниз)
+	jumpSpeed      = -6.5 * SRR // Сила прыжка (отрицательная, так как Y идет вверх)
+	runSpeed       = 0.3 * SRR  // Ускорение бега влево/вправо
+	maxRunSpeed    = 3.0 * SRR  // Максимальная скорость бега
+	friction       = 2.0 * SRR  // Сила трения (уменьшение скорости)
+	jumpCutoffMult = 0.5        // Множитель среза прыжка
 )
 
 // Block - структура платформы.
@@ -269,6 +270,14 @@ func (g *Game) Update() error {
 		g.playerVY = jumpSpeed
 		g.onGround = false
 		g.jumpBufferTimer = 0 // Использовали буфер — обнуляем
+	}
+
+	// Механика прыжка переменной высоты
+	if inpututil.IsKeyJustReleased(ebiten.KeySpace) && g.playerVY < jumpCutoffMult {
+		// Обнуляем или срезаем скорость
+		// Умножение на 0.0 даст резкий "срыв" как в Hollow Knight или Super Meat Boy.
+		// Умножение на 0.5 даст чуть более плавное закругление прыжка как в Mario.
+		g.playerVY = g.playerVY * jumpCutoffMult
 	}
 
 	// Уменьшаем таймер буфера каждый кадр
